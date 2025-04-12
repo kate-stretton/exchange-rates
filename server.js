@@ -3,6 +3,10 @@ const axios = require('axios')
 const app = express()
 const port = 3000
 
+// Cache set up
+const cache = {}
+const CACHE_DURATION = 5 * 60 * 1000
+
 // Middleware
 app.use(express.json())
 
@@ -10,10 +14,19 @@ app.use(express.json())
 app.get(['/exchange-rates', '/exchange-rates/:base'], (req, res) => {
   // User can specify the base currency, otherwise it defaults to NZD
   const baseCurrency = req.params.base || 'NZD'
-  // User can sepcify the currencies they'd like to see exchange rates for
+  // User can specify the currencies they'd like to see exchange rates for
   const chosenCurrencies = req.query.symbols
     ? req.query.symbols.split(',')
     : null
+
+  // Cache key
+  const cacheKey = `${baseCurrency}-${chosenCurrencies?.join(',') || 'all'}`
+
+  // Check for a cached result
+  const cachedResult = cache[cacheKey]
+  if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_DURATION) {
+    return res.json(cachedResult.data)
+  }
 
   // Helper function to calculate average rates
   const calculateAverageRates = (frankfurterRates, exchangeApiRates) => {
@@ -64,11 +77,19 @@ app.get(['/exchange-rates', '/exchange-rates/:base'], (req, res) => {
         exchangeApiRates
       )
 
-      res.json({
+      const result = {
         datasource: 'Free Currency Rates API',
         base: baseCurrency,
         rates: averageRates,
-      })
+      }
+
+      // Cache the result
+      cache[cacheKey] = {
+        data: result,
+        timestamp: Date.now(),
+      }
+
+      res.json(result)
     })
     .catch((error) => res.status(500).json({ error }))
 })
