@@ -8,6 +8,9 @@ app.use(express.json())
 
 // Fetch and average rates from both apis
 app.get('/exchange-rates', (req, res) => {
+  // User can specify base currency
+  const baseCurrency = req.query.base
+
   // Helper function to calculate average rates
   const calculateAverageRates = (frankfurterRates, exchangeApiRates) => {
     const average = {}
@@ -33,16 +36,17 @@ app.get('/exchange-rates', (req, res) => {
 
   // API requests
   const frankfurterRequest = axios.get(
-    'https://api.frankfurter.dev/v1/latest?base=NZD'
+    `https://api.frankfurter.dev/v1/latest?base=${baseCurrency}`
   )
   const exchangeApiRequest = axios.get(
-    'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/nzd.json'
+    `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${baseCurrency.toLowerCase()}.json`
   )
 
   Promise.all([frankfurterRequest, exchangeApiRequest])
     .then(([frankfurterResponse, exchangeApiResponse]) => {
       const frankfurterRates = frankfurterResponse.data.rates
-      const exchangeApiRates = exchangeApiResponse.data.nzd
+      const exchangeApiRates =
+        exchangeApiResponse.data[baseCurrency.toLowerCase()]
 
       const averageRates = calculateAverageRates(
         frankfurterRates,
@@ -51,7 +55,7 @@ app.get('/exchange-rates', (req, res) => {
 
       res.json({
         datasource: 'Free Currency Rates API',
-        base: 'NZD',
+        base: baseCurrency,
         rates: averageRates,
       })
     })
