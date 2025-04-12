@@ -1,5 +1,13 @@
 const express = require('express')
 const axios = require('axios')
+const {
+  recordRequest,
+  recordResponse,
+  recordError,
+  recordCacheHit,
+  recordCacheMiss,
+  getMetrics,
+} = require('./src/services/metricsService')
 const app = express()
 const port = 3000
 
@@ -10,11 +18,15 @@ const CACHE_DURATION = 5 * 60 * 1000
 // Middleware
 app.use(express.json())
 
-// Fetch and average rates from both apis
+// Metrics endpoint
+app.get('/metrics', (req, res) => {
+  res.json(getMetrics())
+})
+
+// Exchange rates endpoint
 app.get(['/exchange-rates', '/exchange-rates/:base'], (req, res) => {
-  // User can specify the base currency, otherwise it defaults to NZD
+  // User can specify the base currency and currencies they'd like to see exchange rates for
   const baseCurrency = req.params.base || 'NZD'
-  // User can specify the currencies they'd like to see exchange rates for
   const chosenCurrencies = req.query.symbols
     ? req.query.symbols.split(',')
     : null
@@ -25,7 +37,10 @@ app.get(['/exchange-rates', '/exchange-rates/:base'], (req, res) => {
   // Check for a cached result
   const cachedResult = cache[cacheKey]
   if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_DURATION) {
+    recordCacheHit()
     return res.json(cachedResult.data)
+  } else {
+    recordCacheMiss()
   }
 
   // Helper function to calculate average rates
@@ -58,16 +73,20 @@ app.get(['/exchange-rates', '/exchange-rates/:base'], (req, res) => {
     return average
   }
 
+  recordRequest()
+
   // API requests
   const frankfurterRequest = axios.get(
     `https://api.frankfurter.dev/v1/latest?base=${baseCurrency}`
   )
+
   const exchangeApiRequest = axios.get(
     `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${baseCurrency.toLowerCase()}.json`
   )
 
   Promise.all([frankfurterRequest, exchangeApiRequest])
     .then(([frankfurterResponse, exchangeApiResponse]) => {
+      recordResponse()
       const frankfurterRates = frankfurterResponse.data.rates
       const exchangeApiRates =
         exchangeApiResponse.data[baseCurrency.toLowerCase()]
@@ -91,7 +110,10 @@ app.get(['/exchange-rates', '/exchange-rates/:base'], (req, res) => {
 
       res.json(result)
     })
-    .catch((error) => res.status(500).json({ error }))
+    .catch((error) => {
+      recordError()
+      res.status(500).json({ error })
+    })
 })
 
 // Server
