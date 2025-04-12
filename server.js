@@ -7,9 +7,8 @@ const port = 3000
 app.use(express.json())
 
 // Fetch and average rates from both apis
-app.get('/exchange-rates', (req, res) => {
-  // User can specify base currency, otherwise default to NZD
-  const baseCurrency = req.query.base || 'NZD'
+app.get(['/exchange-rates', '/exchange-rates/:base'], (req, res) => {
+  const baseCurrency = req.params.base || 'NZD' // Default to NZD if no currency specified
 
   // Helper function to calculate average rates
   const calculateAverageRates = (frankfurterRates, exchangeApiRates) => {
