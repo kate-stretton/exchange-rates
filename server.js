@@ -8,7 +8,12 @@ app.use(express.json())
 
 // Fetch and average rates from both apis
 app.get(['/exchange-rates', '/exchange-rates/:base'], (req, res) => {
-  const baseCurrency = req.params.base || 'NZD' // Default to NZD if no currency specified
+  // User can specify the base currency, otherwise it defaults to NZD
+  const baseCurrency = req.params.base || 'NZD'
+  // User can sepcify the currencies they'd like to see exchange rates for
+  const chosenCurrencies = req.query.symbols
+    ? req.query.symbols.split(',')
+    : null
 
   // Helper function to calculate average rates
   const calculateAverageRates = (frankfurterRates, exchangeApiRates) => {
@@ -19,7 +24,14 @@ app.get(['/exchange-rates', '/exchange-rates/:base'], (req, res) => {
       ...Object.keys(exchangeApiRates),
     ])
 
-    allCurrencies.forEach((currency) => {
+    // Filter currencies if requested
+    const filteredCurrencies = chosenCurrencies
+      ? Array.from(allCurrencies).filter((currency) =>
+          chosenCurrencies.includes(currency)
+        )
+      : allCurrencies
+
+    filteredCurrencies.forEach((currency) => {
       const frankfurterRate = frankfurterRates[currency]
       const exchangeRate = exchangeApiRates[currency]
 
