@@ -14,5 +14,15 @@ app.get('/exchange-rates', (req, res) => {
     .catch((error) => res.status(500).json({ error }))
 })
 
+// Additional fetch for exchange-api using NZD as base currency
+app.get('/exchange-rates/2', (req, res) => {
+  axios
+    .get(
+      'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/nzd.json'
+    )
+    .then((response) => res.json(response.data))
+    .catch((error) => res.status(500).json({ error }))
+})
+
 // Server
 app.listen(port, () => {})
