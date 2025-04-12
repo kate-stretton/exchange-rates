@@ -8,12 +8,14 @@ const {
   recordCacheMiss,
   getMetrics,
 } = require('./src/services/metricsService')
+const {
+  getCacheKey,
+  getCachedData,
+  setCachedData,
+} = require('./src/services/cacheService')
+
 const app = express()
 const port = 3000
-
-// Cache set up
-const cache = {}
-const CACHE_DURATION = 5 * 60 * 1000
 
 // Middleware
 app.use(express.json())
@@ -31,17 +33,14 @@ app.get(['/exchange-rates', '/exchange-rates/:base'], (req, res) => {
     ? req.query.symbols.split(',')
     : null
 
-  // Cache key
-  const cacheKey = `${baseCurrency}-${chosenCurrencies?.join(',') || 'all'}`
-
-  // Check for a cached result
-  const cachedResult = cache[cacheKey]
-  if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_DURATION) {
+  // Check cache
+  const cacheKey = getCacheKey(baseCurrency, chosenCurrencies)
+  const cachedData = getCachedData(cacheKey)
+  if (cachedData) {
     recordCacheHit()
-    return res.json(cachedResult.data)
-  } else {
-    recordCacheMiss()
+    return res.json(cachedData)
   }
+  recordCacheMiss()
 
   // Helper function to calculate average rates
   const calculateAverageRates = (frankfurterRates, exchangeApiRates) => {
@@ -103,10 +102,7 @@ app.get(['/exchange-rates', '/exchange-rates/:base'], (req, res) => {
       }
 
       // Cache the result
-      cache[cacheKey] = {
-        data: result,
-        timestamp: Date.now(),
-      }
+      setCachedData(cacheKey, result)
 
       res.json(result)
     })
