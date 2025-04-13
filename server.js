@@ -1,5 +1,4 @@
 const express = require('express')
-const axios = require('axios')
 const {
   recordRequest,
   recordResponse,
@@ -13,6 +12,7 @@ const {
   getCachedData,
   setCachedData,
 } = require('./src/services/cacheService')
+const { fetchExchangeRates } = require('./src/services/exchangeRateService')
 
 const app = express()
 const port = 3000
@@ -42,68 +42,15 @@ app.get(['/exchange-rates', '/exchange-rates/:base'], (req, res) => {
   }
   recordCacheMiss()
 
-  // Helper function to calculate average rates
-  const calculateAverageRates = (frankfurterRates, exchangeApiRates) => {
-    const average = {}
-
-    const allCurrencies = new Set([
-      ...Object.keys(frankfurterRates),
-      ...Object.keys(exchangeApiRates),
-    ])
-
-    // Filter currencies if requested
-    const filteredCurrencies = chosenCurrencies
-      ? Array.from(allCurrencies).filter((currency) =>
-          chosenCurrencies.includes(currency)
-        )
-      : allCurrencies
-
-    filteredCurrencies.forEach((currency) => {
-      const frankfurterRate = frankfurterRates[currency]
-      const exchangeRate = exchangeApiRates[currency]
-
-      if (frankfurterRate && exchangeRate) {
-        average[currency] = (frankfurterRate + exchangeRate) / 2
-      } else {
-        average[currency] = frankfurterRate || exchangeRate
-      }
-    })
-
-    return average
-  }
-
+  // Record request and fetch new data
   recordRequest()
-
-  // API requests
-  const frankfurterRequest = axios.get(
-    `https://api.frankfurter.dev/v1/latest?base=${baseCurrency}`
-  )
-
-  const exchangeApiRequest = axios.get(
-    `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${baseCurrency.toLowerCase()}.json`
-  )
-
-  Promise.all([frankfurterRequest, exchangeApiRequest])
-    .then(([frankfurterResponse, exchangeApiResponse]) => {
-      recordResponse()
-      const frankfurterRates = frankfurterResponse.data.rates
-      const exchangeApiRates =
-        exchangeApiResponse.data[baseCurrency.toLowerCase()]
-
-      const averageRates = calculateAverageRates(
-        frankfurterRates,
-        exchangeApiRates
-      )
-
-      const result = {
-        datasource: 'Free Currency Rates API',
-        base: baseCurrency,
-        rates: averageRates,
-      }
-
+  fetchExchangeRates(baseCurrency, chosenCurrencies)
+    .then((result) => {
       // Cache the result
       setCachedData(cacheKey, result)
 
+      // Record successful response
+      recordResponse()
       res.json(result)
     })
     .catch((error) => {
