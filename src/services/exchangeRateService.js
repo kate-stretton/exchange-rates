@@ -65,4 +65,5 @@ const fetchExchangeRates = (baseCurrency, chosenCurrencies) => {
 
 module.exports = {
   fetchExchangeRates,
+  calculateAverageRates,
 }
